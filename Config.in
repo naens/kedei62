@@ -1,0 +1,8 @@
+config BR2_PACKAGE_KEDEI62
+	bool "kedei62"
+	depends on BR2_LINUX_KERNEL
+	help
+	  DRM driver for the KeDei 6.2" SPI display.
+
+comment "kedei62 needs a Linux kernel to be built"
+	depends on !BR2_LINUX_KERNEL

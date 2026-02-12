@@ -1,0 +1,66 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2835", "brcm,bcm2837";
+
+    fragment@0 {
+        target = <&spi0>;
+        __overlay__ {
+            status = "okay";
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            /*
+             * Override cs-gpios:
+             *   CE0 slot: <0> = not managed by SPI core (GPIO 8
+             *     is used by the driver as a 74HC595 latch signal).
+             *   CE1 slot: GPIO 7, active-low — the KeDei CPLD
+             *     accepts data while CE1 is held LOW.
+             */
+            cs-gpios = <0>,              /* CE0: not managed  */
+                       <&gpio 7 1>;      /* CE1: GPIO_ACTIVE_LOW */
+
+            spidev@0 {
+                reg = <0>;
+                status = "disabled";
+            };
+
+            spidev@1 {
+                reg = <1>;
+                status = "disabled";
+            };
+        };
+    };
+
+    fragment@1 {
+        target = <&spi0>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            kedei62: kedei62@1 {
+                compatible = "kedei,kedei62";
+                reg = <1>;
+
+                spi-max-frequency = <39000000>;
+                rotate = <270>;
+                buswidth = <8>;
+
+                /*
+                 * GPIO 8 (CE0) → 74HC595 RCLK (latch).
+                 * The driver toggles it HIGH/LOW around each
+                 * 3-byte SPI packet.
+                 */
+                cs-gpios = <&gpio 8 0>; /* GPIO_ACTIVE_HIGH */
+            };
+        };
+    };
+
+    __overrides__ {
+        speed  = <&kedei62>,"spi-max-frequency:0";
+        rotate = <&kedei62>,"rotate:0";
+    };
+};
+
+
