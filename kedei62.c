@@ -123,13 +123,6 @@ static void lcd_data(struct kedei62 *kd, u8 dat)
 	kedei_write(kd, 0x15, 0x00, dat);
 }
 
-/* Program the Memory Access Control register (0x36) for rotation. */
-static void lcd_setrotation(struct kedei62 *kd, u8 m)
-{
-	lcd_cmd(kd, 0x36);
-	lcd_data(kd, lcd_rotations[m & 3]);
-}
-
 /* Send a command followed by a variable-length data sequence. */
 static void kedei62_command_buf(struct kedei62 *kd, u8 cmd,
 				const u8 *data, size_t len)
@@ -146,6 +139,12 @@ static void kedei62_command_buf(struct kedei62 *kd, u8 cmd,
 	const u8 d[] = { seq }; \
 	kedei62_command_buf(kd, cmd, d, ARRAY_SIZE(d)); \
 })
+
+/* Program the Memory Access Control register (0x36) for rotation. */
+static void lcd_setrotation(struct kedei62 *kd, u8 m)
+{
+	kedei62_command(kd, 0x36, lcd_rotations[m & 3]);
+}
 
 /* ------------------------------------------------------------------ */
 /*  Hardware reset / power control                                    */
@@ -187,19 +186,9 @@ static void fill_black(struct kedei62 *kd)
 	if (!total)
 		return;
 
-	lcd_cmd(kd, 0x2A);
-	lcd_data(kd, 0x00);
-	lcd_data(kd, 0x00);
-	lcd_data(kd, (kd->width - 1) >> 8);
-	lcd_data(kd, (kd->width - 1) & 0xFF);
-
-	lcd_cmd(kd, 0x2B);
-	lcd_data(kd, 0x00);
-	lcd_data(kd, 0x00);
-	lcd_data(kd, (kd->height - 1) >> 8);
-	lcd_data(kd, (kd->height - 1) & 0xFF);
-
-	lcd_cmd(kd, 0x2C);
+	kedei62_command(kd, 0x2A, 0x00, 0x00, (kd->width - 1) >> 8, (kd->width - 1) & 0xFF);
+	kedei62_command(kd, 0x2B, 0x00, 0x00, (kd->height - 1) >> 8, (kd->height - 1) & 0xFF);
+	kedei62_command(kd, 0x2C);
 
 	for (i = 0; i < total; i++)
 		kedei_write(kd, 0x15, 0x00, 0x00);
@@ -226,21 +215,13 @@ static void kedei62_push_pixels(struct kedei62 *kd, struct drm_rect *rect)
 		return;
 
 	/* Column address set (0x2A) */
-	lcd_cmd(kd, 0x2A);
-	lcd_data(kd, rect->x1 >> 8);
-	lcd_data(kd, rect->x1 & 0xFF);
-	lcd_data(kd, (rect->x2 - 1) >> 8);
-	lcd_data(kd, (rect->x2 - 1) & 0xFF);
+	kedei62_command(kd, 0x2A, rect->x1 >> 8, rect->x1 & 0xFF, (rect->x2 - 1) >> 8, (rect->x2 - 1) & 0xFF);
 
 	/* Page address set (0x2B) */
-	lcd_cmd(kd, 0x2B);
-	lcd_data(kd, rect->y1 >> 8);
-	lcd_data(kd, rect->y1 & 0xFF);
-	lcd_data(kd, (rect->y2 - 1) >> 8);
-	lcd_data(kd, (rect->y2 - 1) & 0xFF);
+	kedei62_command(kd, 0x2B, rect->y1 >> 8, rect->y1 & 0xFF, (rect->y2 - 1) >> 8, (rect->y2 - 1) & 0xFF);
 
 	/* Memory write (0x2C) */
-	lcd_cmd(kd, 0x2C);
+	kedei62_command(kd, 0x2C);
 
 	for (y = rect->y1; y < rect->y2; y++) {
 		u16 *line = (u16 *)((u8 *)kd->fb_vaddr +
@@ -312,19 +293,18 @@ static void kedei62_pipe_enable(struct drm_simple_display_pipe *pipe,
 	reset(kd);
 
 	/* NOP + synchronization pulses to flush the 74HC595 pipeline */
-	lcd_cmd(kd, 0x00);
+	kedei62_command(kd, 0x00);
 	mdelay(10);
-	lcd_cmd(kd, 0xFF);
-	lcd_cmd(kd, 0xFF);
+	kedei62_command(kd, 0xFF);
+	kedei62_command(kd, 0xFF);
 	mdelay(10);
-	lcd_cmd(kd, 0xFF);
-	lcd_cmd(kd, 0xFF);
-	lcd_cmd(kd, 0xFF);
-	lcd_cmd(kd, 0xFF);
+	kedei62_command(kd, 0xFF);
+	kedei62_command(kd, 0xFF);
+	kedei62_command(kd, 0xFF);
 	mdelay(15);
 
 	/* 0x11: Sleep Out — wake up the controller */
-	lcd_cmd(kd, 0x11);
+	kedei62_command(kd, 0x11);
 	mdelay(150);
 
 	/* 0xB0: Manufacturer Command Access Protect — unlock */
@@ -378,7 +358,7 @@ static void kedei62_pipe_enable(struct drm_simple_display_pipe *pipe,
 	kedei62_command(kd, 0xD2, 0x03, 0x14, 0x04);
 
 	/* 0x29: Display ON */
-	lcd_cmd(kd, 0x29);
+	kedei62_command(kd, 0x29);
 	mdelay(30);
 
 	/* 0x2A: Column Address Set — 0..319 (0x013F) */
@@ -391,7 +371,7 @@ static void kedei62_pipe_enable(struct drm_simple_display_pipe *pipe,
 	kedei62_command(kd, 0xB4, 0x00);
 
 	/* 0x2C: Memory Write — ready for pixel data */
-	lcd_cmd(kd, 0x2C);
+	kedei62_command(kd, 0x2C);
 	mdelay(10);
 
 	/*
