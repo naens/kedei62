@@ -12,7 +12,6 @@
  * updates — pipe_update() records dirty rectangles and schedules a
  * worker that pushes pixels to the panel over SPI.
  *
- * Copyright (c) 2025 naens <naens@gmx.com>
  */
 
 #include <linux/delay.h>
